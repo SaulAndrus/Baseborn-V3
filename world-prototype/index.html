@@ -88,6 +88,22 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 #zoom button{width:42px;height:42px;border:2px solid var(--paper);background:var(--ui);font-size:20px;font-weight:700;line-height:1;transition:background .2s,color .2s}
 #zoom button:hover{background:var(--paper);color:var(--ink)}
 @media (max-width:720px){#zoom{right:14px;bottom:96px}#zoom button{width:44px;height:44px}}
+#closeup{position:fixed;left:0;top:76px;bottom:0;right:min(440px,100%);z-index:28;display:flex;align-items:center;justify-content:center;background:rgba(6,5,4,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .5s}
+#closeup.open{opacity:1;pointer-events:auto}
+#cuFrame{position:relative;border:3px solid var(--c,#efe6d4);box-shadow:0 24px 70px rgba(0,0,0,.7);transform:scale(.95);transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+#closeup.open #cuFrame{transform:none}
+#cuImg{display:block;width:100%;height:100%;object-fit:cover}
+.spot{position:absolute;display:flex;align-items:center;gap:6px;transform:translate(-8px,-50%);opacity:0;animation:spotIn .45s forwards}
+.spot.l{flex-direction:row-reverse;transform:translate(calc(-100% + 8px),-50%)}
+.spot i{width:16px;height:16px;border-radius:50%;background:var(--c,#efe6d4);border:3px solid var(--paper);animation:pulse 2.2s infinite;flex:none}
+.spot span{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;background:var(--ui);padding:5px 7px;border-left:3px solid var(--c,#efe6d4);white-space:nowrap;transition:.2s}
+.spot.l span{border-left:0;border-right:3px solid var(--c,#efe6d4)}
+.spot span{opacity:0;pointer-events:none}
+.spot:hover span,.spot:focus-visible span,.spot.armed span{opacity:1;background:var(--paper);color:var(--ink)}
+.spot:hover i,.spot.armed i{transform:scale(1.25)}
+@keyframes spotIn{to{opacity:1}}
+#cuClose{position:absolute;top:10px;right:10px;width:34px;height:34px;background:var(--paper);color:var(--ink);font-weight:700;font-size:18px;border:2px solid var(--ink);z-index:2}
+@media (max-width:720px){#closeup{top:0;right:0;bottom:56vh;padding-top:56px}.spot span{font-size:8px;padding:3px 5px}.spot i{width:13px;height:13px;border-width:2px}}
 #toast{position:fixed;left:50%;bottom:80px;transform:translate(-50%,20px);z-index:70;background:var(--paper);color:var(--ink);padding:10px 16px;font-size:12px;font-weight:700;letter-spacing:.1em;opacity:0;transition:.3s;pointer-events:none}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 
@@ -136,6 +152,8 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
     <div class="nav2"><button id="pPrev">← Prev</button><button id="pNext">Next →</button></div>
   </div>
 </aside>
+
+<div id="closeup" aria-hidden="true"><div id="cuFrame"><img id="cuImg" alt=""><div id="cuSpots"></div><button id="cuClose" aria-label="Close">×</button></div></div>
 
 <nav id="index" aria-hidden="true">
   <button class="chip x" id="iClose">Close</button>

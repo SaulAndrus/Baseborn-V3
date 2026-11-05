@@ -25,15 +25,16 @@ const LAYOUT={
    records:{pos:[16,9,-37],off:[-6,14,20]},rooftop:{pos:[-14,11,-24],off:[8,14,16]},alley:{pos:[-32,23,-4],off:[12,26,32]},gas:{pos:[29,8,33],off:[-4,9,17]}}
 };
 const bySlug=a=>Object.fromEntries((a||[]).map(x=>[x.slug,x]));
-const FD=bySlug(C.foundlings),PG=bySlug(C.pages),SH=bySlug(C.shop_links);
+const FD=bySlug(C.foundlings),PG=bySlug(C.pages),SH=bySlug(C.shop_links),SO=bySlug(C.social_links);
 const UI=Object.assign({},(C.site&&C.site.ui)||{});
 const SG=C.signage||{};
-const routeOf=l=>!l?'#':l.type==='shop'?((SH[l.ref]&&SH[l.ref].acf.url)||'#'):l.type==='page'?((PG[l.ref]&&PG[l.ref].link)||'#'):l.type==='scene'?'@'+l.ref:l.type==='external'?(l.url||'#'):'#';
+const routeOf=l=>!l?'#':l.type==='shop'?((SH[l.ref]&&SH[l.ref].acf.url)||'#'):l.type==='page'?((PG[l.ref]&&PG[l.ref].link)||'#'):l.type==='social'?((SO[l.ref]&&SO[l.ref].acf.url)||('/social/'+l.ref)):l.type==='scene'?'@'+l.ref:l.type==='external'?(l.url||'#'):'#';
 function toLoc(p){const a=p.acf||{},f=a.foundling?FD[a.foundling]:null,lay=(LAYOUT[a.scene]||{})[p.slug];
   if(!lay)console.warn('No layout for location',p.slug);
   return {id:p.slug,short:dec(a.short_title||p.title.rendered),name:dec(p.title.rendered),
     tag:dec(a.tag||(f?f.acf.nickname.toUpperCase():'')),c:a.accent||(f?f.acf.color:'#efe6d4'),who:dec(a.subtitle||(f?f.acf.traits:'')),
-    body:dec(a.body),ctas:(a.ctas||[]).map(c=>[dec(c.label),routeOf(c.link)]),pos:(lay||{pos:[0,3,0]}).pos,off:(lay||{off:[0,8,10]}).off}}
+    body:dec(a.body),ctas:(a.ctas||[]).map(c=>[dec(c.label),routeOf(c.link)]),pos:(lay||{pos:[0,3,0]}).pos,off:(lay||{off:[0,8,10]}).off,
+    closeup:a.closeup&&a.closeup.image?{src:a.closeup.image.url,w:a.closeup.image.width,h:a.closeup.image.height,alt:dec(a.closeup.image.alt||''),spots:(a.closeup.hotspots||[]).map(s=>({label:dec(s.label),x:s.x,y:s.y,r:routeOf(s.link)}))}:null}}
 const sceneList=sc=>(C.locations||[]).filter(l=>l.acf&&l.acf.scene===sc).sort((a,b)=>(a.acf.menu_order||0)-(b.acf.menu_order||0)).map(toLoc);
 const ROOM=sceneList('room'),CITY=sceneList('city');
 const LISTS={room:ROOM,city:CITY};
@@ -687,17 +688,36 @@ let panelIdx=-1;const panel=$('#panel');
 function openPanel(i){const L=LISTS[active][i];panelIdx=i;panel.style.setProperty('--c',L.c);
   $('#pNum').textContent=String(i+1).padStart(2,'0');$('#pTag').textContent=L.tag;$('#pTitle').textContent=L.name;$('#pBody').textContent=L.body;$('#pWho span').textContent=L.who;
   $('#pCtas').innerHTML=L.ctas.map(([t,r])=>`<button class="cta" data-r="${r}">${t}<span>→</span></button>`).join('');
-  $('#hint').style.opacity=0;panel.classList.add('open');panel.setAttribute('aria-hidden','false');try{history.replaceState(null,'','#'+L.id)}catch(e){}}
-function closePanel(back=true){if(panelIdx<0)return;panel.classList.remove('open');panel.setAttribute('aria-hidden','true');panelIdx=-1;
+  showCloseup(L);$('#hint').style.opacity=0;panel.classList.add('open');panel.setAttribute('aria-hidden','false');try{history.replaceState(null,'','#'+L.id)}catch(e){}}
+function closePanel(back=true){hideCloseup();if(panelIdx<0)return;panel.classList.remove('open');panel.setAttribute('aria-hidden','true');panelIdx=-1;
   try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
   if(back){const h=HOME[active]();fly(h.t,h.p,1.5)}}
 $('#pClose').onclick=()=>closePanel();
 const step=d=>{const n=LISTS[active].length,i=(panelIdx+d+n)%n;closePanel(false);flyToLoc(i)};
 $('#pPrev').onclick=()=>step(-1);$('#pNext').onclick=()=>step(1);
-$('#pCtas').addEventListener('click',e=>{const b=e.target.closest('.cta');if(!b)return;const r=b.dataset.r;
+/* one place that decides where every button and hotspot goes */
+function go(r){if(!r)return;
   if(r==='@city'){closePanel(false);fly(V(-3.75,3.8,-7),V(-3.75,4,-2.5),1.2,()=>switchScene('city'),false);return}
   if(r==='@room'){closePanel(false);fly(V(-12.5,3,5),V(-4,5,9),1.4,()=>switchScene('room'));return}
-  toast((UI.route_toast||'Route ready:')+' '+r)});
+  toast((UI.route_toast||'Route ready:')+' '+r)}
+$('#pCtas').addEventListener('click',e=>{const b=e.target.closest('.cta');if(b)go(b.dataset.r)});
+/* close up screens: the matching render opens over the world with live hotspots */
+const cu=$('#closeup'),cuFrame=$('#cuFrame'),cuImg=$('#cuImg'),cuSpots=$('#cuSpots');
+function fitCloseup(){if(!cu||!cu.classList.contains('open'))return;const w=+cuImg.dataset.w,h=+cuImg.dataset.h;
+  const box=cu.getBoundingClientRect(),pad=mobile()?14:36,maxW=box.width-pad*2,maxH=box.height-pad*2,k=Math.min(maxW/w,maxH/h);
+  cuFrame.style.width=Math.round(w*k)+'px';cuFrame.style.height=Math.round(h*k)+'px'}
+function showCloseup(L){if(!cu)return;if(!L.closeup){hideCloseup();return}
+  const c=L.closeup;cuImg.src=c.src;cuImg.alt=c.alt;cuImg.dataset.w=c.w;cuImg.dataset.h=c.h;cu.style.setProperty('--c',L.c);
+  cuSpots.innerHTML=c.spots.map((s,i)=>`<button class="spot${s.x>66?' l':''}" style="left:${s.x}%;top:${s.y}%;animation-delay:${.15+i*.06}s" data-r="${s.r}" aria-label="${s.label}"><i></i><span>${s.label}</span></button>`).join('');
+  cu.classList.add('open');cu.setAttribute('aria-hidden','false');fitCloseup()}
+function hideCloseup(){if(!cu)return;cu.classList.remove('open');cu.setAttribute('aria-hidden','true')}
+const touchy=matchMedia('(hover:none)').matches;
+cuSpots&&cuSpots.addEventListener('click',e=>{const b=e.target.closest('.spot');if(!b)return;
+  if(touchy&&!b.classList.contains('armed')){cuSpots.querySelectorAll('.armed').forEach(x=>x.classList.remove('armed'));b.classList.add('armed');return}
+  go(b.dataset.r)});
+$('#cuClose')&&($('#cuClose').onclick=()=>closePanel());
+cu&&cu.addEventListener('click',e=>{if(e.target===cu)closePanel()});
+addEventListener('resize',fitCloseup);
 addEventListener('keydown',e=>{if(e.key==='Escape'){closeIndex();closePanel()}if(panelIdx>=0&&e.key==='ArrowRight')step(1);if(panelIdx>=0&&e.key==='ArrowLeft')step(-1)});
 const idx=$('#index');
 ['room','city'].forEach(sc=>{$(sc==='room'?'#iRoom':'#iCity').innerHTML=LISTS[sc].map((L,i)=>`<li><button data-s="${sc}" data-i="${i}" style="--c:${L.c}"><span>${String(i+1).padStart(2,'0')}</span>${L.short}<em>${L.tag}</em></button></li>`).join('')});
